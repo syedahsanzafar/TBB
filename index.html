@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Dashboard</title>
+
+    <!-- PWA Setup -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SalesDash">
+    <link rel="apple-touch-icon" href="icon.svg">
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW Registered!', reg.scope))
+                    .catch(err => console.log('SW Registration Failed:', err));
+            });
+        }
+    </script>
+
+    <!-- Removed external resources for offline compatibility -->
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+
+        header {
+            background-color: var(--card-bg);
+            padding: 1rem 2rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .admin-input {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 2rem;
+            font-size: 0.875rem;
+            width: 120px;
+            background-color: #f9fafb;
+            transition: all 0.2s;
+        }
+
+        .admin-input:focus {
+            width: 150px;
+            border-color: var(--primary-color);
+            outline: none;
+            background-color: white;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--success);
+            font-weight: 500;
+            background: #ecfdf5;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            border: 1px solid #d1fae5;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .status-dot::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            background-color: var(--success);
+            border-radius: 50%;
+            opacity: 0.7;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0.7;
+            }
+
+            70% {
+                transform: translate(-50%, -50%) scale(3);
+                opacity: 0;
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0;
+            }
+        }
+
+        .app-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 1rem 2rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            background: none;
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--primary-color);
+        }
+
+        .tab-btn.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* KPI Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .kpi-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .kpi-card.danger {
+            border-left-color: var(--danger);
+        }
+
+        .kpi-card h4 {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .kpi-card p {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .chart-header {
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-header h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .chart-desc {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        .chart-container.large {
+            height: 400px;
+        }
+
+        /* Item Charts Grid (Small Donuts) */
+        .item-charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 2rem;
+            padding: 1rem 0;
+        }
+
+        .mini-chart-wrapper {
+            text-align: center;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            background: #fafafa;
+        }
+
+        .mini-chart-wrapper h5 {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .mini-canvas-container {
+            position: relative;
+            height: 180px;
+            width: 100%;
+        }
+
+        @media (max-width: 1024px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Data Table Styling */
+        .data-controls {
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .primary-btn,
+        .secondary-btn,
+        .delete-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            border: none;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .primary-btn {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .primary-btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .secondary-btn {
+            background-color: #9ca3af;
+            color: white;
+        }
+
+        .secondary-btn:hover {
+            background-color: #6b7280;
+        }
+
+        .delete-btn {
+            background-color: #fee2e2;
+            color: var(--danger);
+            padding: 0.25rem 0.75rem;
+        }
+
+        .delete-btn:hover {
+            background-color: #fecaca;
+        }
+
+        .table-container {
+            background: var(--card-bg);
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th,
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.25rem;
+            font-size: 0.9rem;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Production & Sales Dashboard</h1>
+            <div class="header-right">
+                <input type="text" id="adminCode" placeholder="Enter Code" class="admin-input">
+                <div class="connection-status">
+                    <div class="status-dot"></div>
+                    <span>Database Connected</span>
+                </div>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" onclick="switchTab('dashboard')">Dashboard</button>
+            <button id="dataTabBtn" class="tab-btn" onclick="switchTab('data')" style="display: none">Data
+                Management</button>
+        </nav>
+
+        <main id="dashboard" class="tab-content active">
+            <!-- KPI Cards -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <h4>Total Target</h4>
+                    <p id="kpiTarget">0</p>
+                </div>
+                <div class="kpi-card">
+                    <h4>Total Sales</h4>
+                    <p id="kpiSold">0</p>
+                </div>
+                <div class="kpi-card">
+                    <h4>Achievement Rate</h4>
+                    <p id="kpiRate">0%</p>
+                </div>
+                <div class="kpi-card danger">
+                    <h4>Unsold Stock</h4>
+                    <p id="kpiStock">0</p>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="charts-grid">
+                <!-- Row 1: Main Sales Performance -->
+                <div class="chart-card full-width">
+                    <div class="chart-header">
+                        <h3>Sales Performance (Target vs Sold)</h3>
+                        <p class="chart-desc">Compare actual sales against sales targets per book.</p>
+                    </div>
+                    <div class="chart-container large">
+                        <canvas id="salesVsTargetChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Row 4: Per-Book Detail Grid -->
+                <div class="chart-card full-width">
+                    <div class="chart-header">
+                        <h3>Per-Book Efficiency Breakdown</h3>
+                        <p class="chart-desc">Individual print utilization for each book (Sold vs. Stock).</p>
+                    </div>
+                    <div id="itemChartsGrid" class="item-charts-grid">
+                        <!-- Dynamic content -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <main id="data" class="tab-content">
+            <div class="data-controls">
+                <button id="addRowBtn" class="primary-btn">Add New Row</button>
+                <button id="resetBtn" class="secondary-btn">Reset to Default</button>
+            </div>
+            <div class="table-container">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Target</th>
+                            <th>Printed</th>
+                            <th>Sold</th>
+                            <th>Stock (Calc)</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Rows generated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const defaultData = [
+            { name: "H6", target: 5000, printed: 5000, sold: 7835 },
+            { name: "H7", target: 5000, printed: 5000, sold: 5915 },
+            { name: "H8", target: 5000, printed: 5000, sold: 8130 },
+            { name: "U3", target: 40000, printed: 25000, sold: 20605 },
+            { name: "U4", target: 40000, printed: 30000, sold: 27110 },
+            { name: "U5", target: 40000, printed: 35000, sold: 30670 },
+            { name: "E3", target: 40000, printed: 25000, sold: 20995 },
+            { name: "E4", target: 40000, printed: 30000, sold: 25370 },
+            { name: "E5", target: 40000, printed: 35000, sold: 29710 }
+        ];
+
+        let appData = JSON.parse(localStorage.getItem('dashboardData')) || JSON.parse(JSON.stringify(defaultData));
+
+        const colors = {
+            primary: '#4f46e5',    // Sold Color
+            bgPrimary: '#e0e7ff',  // Target Color
+            gray: '#d1d5db'        // Stock Color for donut
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderTable();
+            updateDashboard();
+
+            document.getElementById('addRowBtn').addEventListener('click', addRow);
+            document.getElementById('resetBtn').addEventListener('click', resetData);
+
+            document.getElementById('adminCode').addEventListener('input', (e) => {
+                const btn = document.getElementById('dataTabBtn');
+                if (e.target.value.toLowerCase() === 'action') {
+                    btn.style.display = 'block';
+                } else {
+                    btn.style.display = 'none';
+                    if (document.getElementById('data').classList.contains('active')) {
+                        switchTab('dashboard');
+                    }
+                }
+            });
+
+            // Resize listener to redraw charts
+            window.addEventListener('resize', updateCharts);
+        });
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+            document.getElementById(tabId).classList.add('active');
+            document.querySelector(`button[onclick="switchTab('${tabId}')"]`).classList.add('active');
+
+            if (tabId === 'dashboard') {
+                // Short delay to ensure layout is done
+                setTimeout(updateCharts, 50);
+            }
+        }
+
+        function calculateStock(item) {
+            return item.printed - item.sold;
+        }
+
+        // --- Data Management Functions ---
+        function renderTable() {
+            const tbody = document.querySelector('#dataTable tbody');
+            tbody.innerHTML = '';
+            appData.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                const stock = calculateStock(item);
+                tr.innerHTML = `
+            <td><input type="text" value="${item.name}" onchange="updateData(${index}, 'name', this.value)"></td>
+            <td><input type="number" value="${item.target}" onchange="updateData(${index}, 'target', this.value)"></td>
+            <td><input type="number" value="${item.printed}" onchange="updateData(${index}, 'printed', this.value)"></td>
+            <td><input type="number" value="${item.sold}" onchange="updateData(${index}, 'sold', this.value)"></td>
+            <td class="stock-cell">${stock}</td>
+            <td><button class="delete-btn" onclick="deleteRow(${index})">Delete</button></td>
+        `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateData(index, field, value) {
+            if (field === 'name') {
+                appData[index][field] = value;
+            } else {
+                appData[index][field] = Number(value);
+            }
+            saveData();
+            renderTable();
+        }
+
+        function addRow() {
+            appData.push({ name: "New", target: 0, printed: 0, sold: 0 });
+            renderTable();
+            saveData();
+        }
+
+        function deleteRow(index) {
+            appData.splice(index, 1);
+            renderTable();
+            saveData();
+        }
+
+        function resetData() {
+            if (confirm('Are you sure you want to reset all data to default?')) {
+                appData = JSON.parse(JSON.stringify(defaultData));
+                renderTable();
+                saveData();
+                updateDashboard();
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('dashboardData', JSON.stringify(appData));
+        }
+
+        // --- Dashboard Logic ---
+
+        function updateDashboard() {
+            updateKPIs();
+            updateCharts();
+        }
+
+        function updateKPIs() {
+            const totalTarget = appData.reduce((sum, item) => sum + item.target, 0);
+            const totalSold = appData.reduce((sum, item) => sum + item.sold, 0);
+            const totalPrinted = appData.reduce((sum, item) => sum + item.printed, 0);
+            const totalStock = totalPrinted - totalSold;
+            const achievementRate = totalTarget > 0 ? ((totalSold / totalTarget) * 100).toFixed(1) : 0;
+
+            document.getElementById('kpiTarget').textContent = totalTarget.toLocaleString();
+            document.getElementById('kpiSold').textContent = totalSold.toLocaleString();
+            document.getElementById('kpiRate').textContent = achievementRate + '%';
+            document.getElementById('kpiStock').textContent = totalStock.toLocaleString();
+        }
+
+        // --- Native Charting (No External Libraries) ---
+
+        function updateCharts() {
+            // Main Sales vs Target Chart
+            const labels = appData.map(d => d.name);
+            const targets = appData.map(d => d.target);
+            const sales = appData.map(d => d.sold);
+            drawNativeBarChart('salesVsTargetChart', labels, targets, sales);
+
+            // Item Donuts
+            renderItemCharts();
+        }
+
+        function drawNativeBarChart(canvasId, labels, dataset1, dataset2) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const container = canvas.parentElement;
+
+            // Set resolution for sharp text
+            const dpr = window.devicePixelRatio || 1;
+            const rect = container.getBoundingClientRect();
+
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+
+            const width = rect.width;
+            const height = rect.height;
+
+            ctx.clearRect(0, 0, width, height);
+
+            const padding = { top: 30, right: 20, bottom: 40, left: 50 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+
+            const maxVal = Math.max(...dataset1, ...dataset2, 1);
+            // Round up max value nicely
+            const niceMax = Math.ceil(maxVal / 1000) * 1000 || maxVal;
+            const scale = chartHeight / niceMax;
+
+            // Draw Y Axis grid
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.lineWidth = 1;
+            ctx.fillStyle = '#6b7280';
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+
+            for (let i = 0; i <= 5; i++) {
+                const yVal = (niceMax / 5) * i;
+                const yPos = padding.top + chartHeight - (yVal * scale);
+
+                // Grid line
+                ctx.beginPath();
+                ctx.moveTo(padding.left, yPos);
+                ctx.lineTo(width - padding.right, yPos);
+                ctx.stroke();
+
+                // Text
+                ctx.fillText(Math.round(yVal).toLocaleString(), padding.left - 10, yPos);
+            }
+
+            // Draw Bars
+            const groupWidth = chartWidth / labels.length;
+            const barWidth = groupWidth * 0.35;
+            const gap = groupWidth * 0.1;
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+
+            labels.forEach((label, i) => {
+                const xBase = padding.left + (i * groupWidth) + (groupWidth - (2 * barWidth + gap)) / 2;
+
+                // Target Bar (Light)
+                const h1 = dataset1[i] * scale;
+                ctx.fillStyle = colors.bgPrimary;
+                ctx.fillRect(xBase, padding.top + chartHeight - h1, barWidth, h1);
+
+                // Sales Bar (Dark)
+                const h2 = dataset2[i] * scale;
+                ctx.fillStyle = colors.primary;
+                ctx.fillRect(xBase + barWidth + gap, padding.top + chartHeight - h2, barWidth, h2);
+
+                // Label
+                ctx.fillStyle = '#374151';
+                ctx.fillText(label, xBase + barWidth + gap / 2, padding.top + chartHeight + 10);
+            });
+
+            // Legend
+            // Simple hardcoded legend at top right
+            const legX = width - 150;
+            const legY = 10;
+
+            ctx.fillStyle = colors.bgPrimary;
+            ctx.fillRect(legX, legY, 12, 12);
+            ctx.fillStyle = '#374151';
+            ctx.textAlign = 'left';
+            ctx.fillText("Target", legX + 18, legY);
+
+            ctx.fillStyle = colors.primary;
+            ctx.fillRect(legX + 70, legY, 12, 12);
+            ctx.fillStyle = '#374151';
+            ctx.fillText("Sold", legX + 88, legY);
+        }
+
+        function renderItemCharts() {
+            const container = document.getElementById('itemChartsGrid');
+            container.innerHTML = ''; // Full redraw
+
+            appData.forEach((item, index) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'mini-chart-wrapper';
+
+                const title = document.createElement('h5');
+                title.innerHTML = `<strong>${item.name}</strong><br><span style="font-size:0.8em; font-weight:400">Printed: ${item.printed}</span>`;
+
+                const canvasContainer = document.createElement('div');
+                canvasContainer.className = 'mini-canvas-container';
+
+                const canvas = document.createElement('canvas');
+                canvas.id = `itemChart-${index}`;
+                // Need to append before drawing to get dimensions
+                canvasContainer.appendChild(canvas);
+                wrapper.appendChild(title);
+                wrapper.appendChild(canvasContainer);
+                container.appendChild(wrapper);
+
+                const stock = calculateStock(item);
+                // Clamp negative stock for visualization
+                const chartStock = stock < 0 ? 0 : stock;
+
+                drawNativeDonut(canvas, item.sold, chartStock);
+            });
+        }
+
+        function drawNativeDonut(canvas, sold, stock) {
+            const container = canvas.parentElement;
+            const dpr = window.devicePixelRatio || 1;
+            const rect = container.getBoundingClientRect();
+
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const radius = Math.min(rect.width, rect.height) / 2 - 15;
+            const thickness = 20;
+
+            const total = sold + stock;
+
+            ctx.clearRect(0, 0, rect.width, rect.height);
+
+            if (total === 0) {
+                // Draw empty grey ring
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.strokeStyle = colors.gray;
+                ctx.lineWidth = thickness;
+                ctx.stroke();
+                return;
+            }
+
+            const soldRatio = sold / total;
+            const startAngle = -Math.PI / 2;
+            const soldAngle = soldRatio * 2 * Math.PI;
+
+            // Background Ring (Stock)
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = colors.gray;
+            ctx.lineWidth = thickness;
+            ctx.stroke();
+
+            // Sold Segment (Blue)
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, startAngle, startAngle + soldAngle);
+            ctx.strokeStyle = colors.primary;
+            ctx.lineWidth = thickness;
+            ctx.stroke();
+
+            // Text in middle
+            const percent = Math.round(soldRatio * 100);
+            ctx.fillStyle = '#374151';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(percent + '%', centerX, centerY);
+
+            ctx.font = '12px sans-serif';
+            ctx.fillStyle = '#6b7280';
+            ctx.fillText('Sold', centerX, centerY + 18);
+        }
+    </script>
+</body>
+
+</html>

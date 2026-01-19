@@ -1,0 +1,26 @@
+{
+    "name": "Production & Sales Dashboard",
+    "short_name": "SalesDash",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#f3f4f6",
+    "theme_color": "#4f46e5",
+    "icons": [
+        {
+            "src": "icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icon.svg",
+            "sizes": "192x192",
+            "type": "image/svg+xml"
+        },
+        {
+            "src": "icon.svg",
+            "sizes": "512x512",
+            "type": "image/svg+xml"
+        }
+    ]
+}
